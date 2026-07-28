@@ -42,8 +42,6 @@ const PRICES = {
   '150': { stars: 2000, title: 'חבילה מלאה', days: 90 }
 };
 
-const MINI_APP_URL = 'https://extraordinary-cobbler-26baa3.netlify.app';
-
 async function resolveUser(input) {
   input = String(input).trim();
   if (/^\d+$/.test(input)) return input;
@@ -57,20 +55,19 @@ async function resolveUser(input) {
 }
 
 bot.onText(/\/start(.*)/, async (msg, match) => {
-  const chatId = msg.chat.id;
+  const chatId = String(msg.chat.id);
   const param = (match[1] || '').trim();
   const name = msg.from.first_name || 'לקוח';
-  const userId = String(msg.from.id);
 
-  if (!ADMIN_CHAT_ID) ADMIN_CHAT_ID = chatId;
+  if (!ADMIN_CHAT_ID) ADMIN_CHAT_ID = msg.chat.id;
 
   if (param.startsWith('pay_')) {
     const pkg = param.replace('pay_', '');
-    await sendStarsInvoice(chatId, pkg, name);
+    await sendStarsInvoice(msg.chat.id, pkg, name);
   } else {
     let u = null;
     if (usersCollection) {
-      u = await usersCollection.findOne({ userId });
+      u = await usersCollection.findOne({ $or: [{ userId: chatId }, { _id: chatId }] });
     }
 
     let caption = '';
@@ -106,9 +103,9 @@ bot.onText(/\/start(.*)/, async (msg, match) => {
 
     const logoPath = path.join(__dirname, 'logo.jpg');
     if (fs.existsSync(logoPath)) {
-      bot.sendPhoto(chatId, logoPath, { caption, reply_markup: keyboard });
+      bot.sendPhoto(msg.chat.id, logoPath, { caption, reply_markup: keyboard });
     } else {
-      bot.sendMessage(chatId, caption, { reply_markup: keyboard });
+      bot.sendMessage(msg.chat.id, caption, { reply_markup: keyboard });
     }
   }
 });
@@ -116,17 +113,16 @@ bot.onText(/\/start(.*)/, async (msg, match) => {
 bot.on('callback_query', async (query) => {
   const chatId = query.message.chat.id;
   const userId = String(query.from.id);
-  const name = query.from.first_name || 'לקוח';
   await bot.answerCallbackQuery(query.id);
 
   if (query.data === 'buy_75') {
-    await sendStarsInvoice(chatId, '75', name);
+    await sendStarsInvoice(chatId, '75', query.from.first_name);
   } else if (query.data === 'buy_150') {
-    await sendStarsInvoice(chatId, '150', name);
+    await sendStarsInvoice(chatId, '150', query.from.first_name);
   } else if (query.data === 'enter_members') {
     let u = null;
     if (usersCollection) {
-      u = await usersCollection.findOne({ userId });
+      u = await usersCollection.findOne({ $or: [{ userId: userId }, { _id: userId }] });
     }
 
     if (!u || !u.expiresAt || new Date(u.expiresAt) < new Date()) {
@@ -198,7 +194,6 @@ bot.on('successful_payment', async (msg) => {
   }
 
   bot.sendMessage(msg.chat.id, `✅ התשלום התקבל!\nחבילה: ${info.title}\nבתוקף עד: ${expiresAt}\n\nפתח שוב את עמוד פעיל.`);
-
   if (ADMIN_CHAT_ID) {
     bot.sendMessage(ADMIN_CHAT_ID, `💰 תשלום כוכבים\nשם: ${name}\nמזהה: ${userId}\nחבילה: ${info.title}\nעד: ${expiresAt}`);
   }
@@ -297,7 +292,7 @@ app.get('/api/user/:id', async (req, res) => {
     const userId = req.params.id;
     let u = null;
     if (usersCollection) {
-      u = await usersCollection.findOne({ userId });
+      u = await usersCollection.findOne({ $or: [{ userId: userId }, { _id: userId }] });
     }
 
     if (!u) return res.json({ isRegistered: false });
