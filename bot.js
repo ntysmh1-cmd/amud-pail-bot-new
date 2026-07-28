@@ -94,3 +94,72 @@ bot.launch().then(() => {
 // עצירה נקייה של הבוט
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
+const { Telegraf, Markup } = require('telegraf');
+
+// 1. הגדרת הבוט
+const bot = new Telegraf(process.env.BOT_TOKEN || 'YOUR_BOT_TOKEN');
+
+// 2. מזהה הטלגרם שלך (המנהל) - שים כאן את ה-ID שלך
+const ADMIN_ID = 'הכנס_כאן_את_ה-ID_שליך'; 
+
+// מסד נתונים זמני (או חיבור ל-MongoDB בהמשך)
+const db = {
+    users: new Map()
+};
+
+// 3. פקודת התחלה (/start)
+bot.start(async (ctx) => {
+    // ... (כל הקוד של פקודת סטארט שהיה קודם)
+});
+
+// 4. פקודת ניהול להוספה ידנית (/add) - כאן המקום שלה!
+bot.command('add', async (ctx) => {
+    const senderId = ctx.from.id.toString();
+
+    if (senderId !== ADMIN_ID) {
+        return ctx.reply('❌ אין לך הרשאה להשתמש בפקודה זו.');
+    }
+
+    const args = ctx.message.text.split(' ').slice(1);
+    const targetUserId = args[0];
+    const days = parseInt(args[1]) || 30;
+
+    if (!targetUserId) {
+        return ctx.reply('⚠️ שימוש שגוי. הפורמט הנכון:\n`/add <מזהה_משתמש> <מספר_ימים>`');
+    }
+
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + days);
+
+    db.users.set(targetUserId, {
+        package: `חבילה ידנית (${days} ימים)`,
+        expiryDate: expiryDate
+    });
+
+    return ctx.reply(
+        `✅ הלקוח עודכן בהצלחה!\n\n` +
+        `👤 מזהה: ${targetUserId}\n` +
+        `⏳ בתוקף למשך: ${days} ימים`
+    );
+});
+
+// 5. שאר הפקודות (תשלומים, כפתורים וכו')
+bot.action('pay_package', async (ctx) => {
+    // ...
+});
+
+bot.on('pre_checkout_query', async (ctx) => {
+    await ctx.answerPreCheckoutQuery(true);
+});
+
+bot.on('successful_payment', async (ctx) => {
+    // ...
+});
+
+// 6. הפעלת הבוט - תמיד בסוף הקובץ!
+bot.launch().then(() => {
+    console.log('Bot is running successfully!');
+});
+
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
